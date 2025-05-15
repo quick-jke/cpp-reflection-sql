@@ -3,7 +3,12 @@
 int main(){
     HeaderScanner scanner;
 
-    scanner.scanAllEntities("models");
+    auto tables = scanner.getTables();
+    
+    for(auto table : tables.value()){
+        std::cout << table.toString();
+    }
+
 
     return 0;
 }

@@ -4,16 +4,25 @@
 #include "option.hpp"
 #include "var.hpp"
 #include <string>
-#include <vector>
+#include <set>
+#include <iostream>
+#include "sql.hpp"
 
 class Field{
 public:
-    Field(const std::string& name, VAR type, std::vector<OPTION> options);
+    Field(const std::string& name, const std::string& type, std::set<OPTION> options);
+
+    std::string getSQLNormalize();
+
+    // VAR getType();
+
+    std::string toString();
 
 private:
     std::string name_;
-    VAR type_;
-    std::vector<OPTION> options_;
+    std::string type_;
+    // VAR type_;
+    std::set<OPTION> options_;
 };
 
 #endif

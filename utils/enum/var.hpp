@@ -3,7 +3,9 @@
 
 enum VAR{
     INT,
-    STRING
+    STRING,
+    OBJECT,
+    VECTOR
 };
 
 #endif

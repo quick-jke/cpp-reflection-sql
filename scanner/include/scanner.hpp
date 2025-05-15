@@ -8,48 +8,25 @@
 #include <vector>
 #include <filesystem>
 #include <algorithm>
+#include <set>
+#include <optional>
 
-enum OPTION {
+#include "table.hpp"
 
-    ONE_TO_ONE,
-    ONE_TO_MANY,
-    MANY_TO_MANY,
-    MANY_TO_ONE,
-    ID
-};
-
-
-struct FieldInfo {
-    std::string type;
-    std::string name;
-    std::vector<OPTION> attributes;
-};
-
-struct StructInfo {
-    std::string name;
-    std::vector<FieldInfo> fields;
+struct TableComparator{
+    bool operator()(Table t1, Table t2) const
+    {
+        return t1.getDependencies().size() < t2.getDependencies().size();
+    }
 };
 
 class HeaderScanner {
 public:
-    void scanAllEntities(const std::string& rootDir);
-
-    StructInfo parseStructFromFile(const std::string& filePath);
-
+    std::optional<std::vector<Table>> getTables();
 private:
     bool isEntityFile(const std::filesystem::path& path);
-
-    void parseFields(const std::string& body, std::vector<FieldInfo>& fields);
-
-    void trim(std::string& s);
-    std::string trimCopy(std::string s);
-    void ltrim(std::string& s);
-    void rtrim(std::string& s);
-    std::string replaceAll(std::string str, const std::string& from, const std::string& to);
-
-    void printStructInfo(const StructInfo& info);
-
-    static const std::vector<std::string> KNOWN_MACROS;
+    Table getTableFromFile(const std::string& filePath);
+    std::pair<std::vector<Field>, std::set<std::string>> getFieldsByBody(const std::string& body); 
 };
 
 #endif 
