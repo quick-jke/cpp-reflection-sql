@@ -8,7 +8,7 @@ const std::string& Table::getName() const {
     return name_;
 }
 
-std::set<Field> Table::getFields(){
+const std::set<Field>& Table::getFields() const {
     return fields_;
 }
 

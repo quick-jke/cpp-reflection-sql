@@ -9,9 +9,10 @@ add_custom_target(copy_models ALL
 )
 add_subdirectory(utils)
 add_subdirectory(scanner)
+add_subdirectory(sql)
 
 
 add_executable(testapp app/main.cpp)
 target_include_directories(testapp PRIVATE ${CMAKE_BINARY_DIR})
-target_link_libraries(testapp PUBLIC Scanner)
+target_link_libraries(testapp PUBLIC Scanner Sql)
 

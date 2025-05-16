@@ -18,6 +18,16 @@ public:
 
     std::string toString();
 
+    std::set<OPTION> getOptions(){
+        return options_;
+    }
+
+    std::string stringOptions();
+
+    std::string getType(){
+        return type_;
+    }
+
     bool operator<(const Field& other) const {
         return std::tie(name_) < std::tie(other.getName());
     }

@@ -5,14 +5,16 @@
 #include <vector>
 #include <set>
 #include <tuple>
+#include <map>
 #include "field.hpp"
+
 
 class Table{
 public:
     Table(const std::string& name, std::set<Field> fields, std::set<std::string> dependencies);
     Table();
     const std::string& getName() const;
-    std::set<Field> getFields();
+    const std::set<Field>& getFields() const;
     std::set<std::string> getDependencies();
 
     std::string toString();

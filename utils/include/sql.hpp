@@ -8,5 +8,4 @@
 std::string getStringByVar(VAR var);
 
 
-
 #endif
