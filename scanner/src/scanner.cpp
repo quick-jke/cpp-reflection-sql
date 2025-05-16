@@ -18,13 +18,13 @@ bool HeaderScanner::isEntityFile(const fs::path& path) {
            path.filename().string().find(".entity") != std::string::npos;
 }
 
-std::optional<std::vector<Table>> HeaderScanner::getTables(){
-    std::vector<Table> tables;
+std::optional<std::set<Table>> HeaderScanner::getTables(){
+    std::set<Table> tables;
     try {
         for (const auto& entry : fs::recursive_directory_iterator("models")) {
             if (isEntityFile(entry.path())) {
                 try {
-                    tables.emplace_back(getTableFromFile(entry.path().string()));
+                    tables.insert(getTableFromFile(entry.path().string()));
                 } catch (const std::exception& e) {
                     std::cerr << "Error parsing file " << entry.path() << ": " << e.what() << "\n";
                 }
@@ -157,8 +157,8 @@ void extractDependenciesFromType(const std::string& typeStr, std::set<std::strin
     }
 }
 
-std::pair<std::vector<Field>, std::set<std::string>> HeaderScanner::getFieldsByBody(const std::string& body) {
-    std::vector<Field> fields;
+std::pair<std::set<Field>, std::set<std::string>> HeaderScanner::getFieldsByBody(const std::string& body) {
+    std::set<Field> fields;
     std::set<std::string> dependencies;
     std::istringstream iss(body);
     std::string line;
@@ -182,7 +182,7 @@ std::pair<std::vector<Field>, std::set<std::string>> HeaderScanner::getFieldsByB
         auto fieldType = determineVarType(fieldTypeStr);
         extractDependenciesFromType(fieldTypeStr, dependencies);
 
-        fields.emplace_back(fieldName, fieldType, pendingOptions);
+        fields.insert({fieldName, fieldType, pendingOptions});
         pendingOptions.clear();
     }
 

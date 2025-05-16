@@ -11,6 +11,10 @@ std::string Field::getSQLNormalize(){
     return  "\t" + name_ + " " + type_ + options;
 }
 
+const std::string& Field::getName() const{
+    return name_;
+}
+
 
 std::string Field::toString(){
     std::string options;

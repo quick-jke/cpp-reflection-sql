@@ -1,14 +1,14 @@
 #include "table.hpp"
 Table::Table(){}
 
-Table::Table(const std::string& name, std::vector<Field> fields, std::set<std::string> dependencies) 
+Table::Table(const std::string& name, std::set<Field> fields, std::set<std::string> dependencies) 
     : name_(name), fields_(fields), dependencies_(dependencies){}
 
-std::string Table::getName(){
+const std::string& Table::getName() const {
     return name_;
 }
 
-std::vector<Field> Table::getFields(){
+std::set<Field> Table::getFields(){
     return fields_;
 }
 
@@ -23,13 +23,7 @@ std::string Table::toString(){
         fields += field.toString() + "\n";
     }
 
-    for(int i = 0; i < fields_.size(); ++i){
-        if(i + 1 != fields_.size()){
-            fields += fields_[i].toString() + "\n";
-        }else{
-            fields += fields_[i].toString();
-        }
-    }
+    
 
     for(auto dep : dependencies_){
         dependencies += " " + dep;

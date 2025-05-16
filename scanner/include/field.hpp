@@ -13,10 +13,14 @@ public:
     Field(const std::string& name, const std::string& type, std::set<OPTION> options);
 
     std::string getSQLNormalize();
-
+    const std::string& getName() const;
     // VAR getType();
 
     std::string toString();
+
+    bool operator<(const Field& other) const {
+        return std::tie(name_) < std::tie(other.getName());
+    }
 
 private:
     std::string name_;
