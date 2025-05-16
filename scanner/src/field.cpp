@@ -19,36 +19,36 @@ const std::string& Field::getName() const{
 std::string Field::toString(){
     std::string options;
 
-    
-
-    for(auto option : options_){
-        switch (option)
-        {
-        case ID:{
-            options += " ID";
-            break;
-        }
-        case ONE_TO_MANY:{
-            options += " ONE_TO_MANY";
-            break;
-        }
-        case ONE_TO_ONE:{
-            options += " ONE_TO_ONE";
-            break;
-        }
-        case MANY_TO_MANY:{
-            options += " MANY_TO_MANY";
-            break;
-        }
-        case MANY_TO_ONE:{
-            options += " MANY_TO_ONE";
-            break;
-        }
-        
-        default:
-            break;
+    if(options_.size()){
+        for(auto option : options_){
+            switch (option)
+            {
+            case ID:{
+                options += " ID";
+                break;
+            }
+            case ONE_TO_MANY:{
+                options += " ONE_TO_MANY";
+                break;
+            }
+            case ONE_TO_ONE:{
+                options += " ONE_TO_ONE";
+                break;
+            }
+            case MANY_TO_MANY:{
+                options += " MANY_TO_MANY";
+                break;
+            }
+            case MANY_TO_ONE:{
+                options += " MANY_TO_ONE";
+                break;
+            }
+            
+            default:
+                break;
+            }
         }
     }
-
-    return "\tfield{ name: " + name_ + ", type: " + type_ + ", options: [" + options + " ]}";  
+    
+    return "\tfield{ name: " + name_ + ", type: " + type_ + (options_.size() ? ", options: [" + options + " ]}" : "");  
 }

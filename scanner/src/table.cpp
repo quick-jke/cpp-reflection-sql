@@ -28,5 +28,6 @@ std::string Table::toString(){
     for(auto dep : dependencies_){
         dependencies += " " + dep;
     }
-    return "Table:\n\t" + name_ + "\nfields\n" + fields + "\ndeps:\n\t[" + dependencies + "]\n\n";
+    // return "Table:\n\t" + name_ + "\nfields\n" + fields + "\ndeps:\n\t[" + dependencies + "]\n\n";
+    return "Table:\n\t" + name_ + "\nfields\n" + fields + "\n==============\n";
 }

@@ -117,17 +117,7 @@ void parseFieldLine(const std::string& line, std::string& type, std::string& nam
     }
     type = line.substr(0, lastSpace);
 }
-std::string determineVarType(const std::string& typeStr) {
-    if (typeStr == "int") {
-        return "INT";
-    } else if (typeStr == "std::string") {
-        return "STRING";
-    } else if (typeStr.find("std::vector<") != std::string::npos) {
-        return "VECTOR";
-    } else {
-        return typeStr;
-    }
-}
+
 bool isPrimitiveType(const std::string& type) {
     return type == "int" || type == "std::string";
 }
@@ -179,10 +169,9 @@ std::pair<std::set<Field>, std::set<std::string>> HeaderScanner::getFieldsByBody
             continue; 
         }
 
-        auto fieldType = determineVarType(fieldTypeStr);
         extractDependenciesFromType(fieldTypeStr, dependencies);
 
-        fields.insert({fieldName, fieldType, pendingOptions});
+        fields.insert({fieldName, fieldTypeStr, pendingOptions});
         pendingOptions.clear();
     }
 
