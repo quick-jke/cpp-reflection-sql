@@ -13,20 +13,16 @@ public:
     Field(const std::string& name, const std::string& type, std::set<OPTION> options);
 
     std::string getSQLNormalize();
+    
     const std::string& getName() const;
-    // VAR getType();
 
     std::string toString();
 
-    std::set<OPTION> getOptions(){
-        return options_;
-    }
+    std::set<OPTION> getOptions();
 
     std::string stringOptions();
 
-    std::string getType(){
-        return type_;
-    }
+    std::string getType();
 
     bool operator<(const Field& other) const {
         return std::tie(name_) < std::tie(other.getName());

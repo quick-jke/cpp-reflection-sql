@@ -1,8 +1,9 @@
 #include "sql_builder.hpp"
 
 SQLBuilder::SQLBuilder(){
-
 }
+
+
 
 
 std::string getReferencedTableName(const std::string& type) {
@@ -30,7 +31,6 @@ void generateManyToManyTables(std::set<Table> tables) {
         for (auto field : table.getFields()) {
             if (field.getOptions().count(OPTION::MANY_TO_MANY)) {
                 std::string other_table = getReferencedTableName(field.getType());
-
                 std::string table1 = table.getName();
                 std::string table2 = other_table;
 
@@ -54,58 +54,69 @@ void generateManyToManyTables(std::set<Table> tables) {
     }
 }
 
-bool analysField(Field field, std::string table_name) {
-    std::string option_str;
-    std::string foreign_key;
 
+std::optional<std::string> SQLBuilder::getNormalizeField(Field field, const std::string& tableName) {
     std::string sql_type;
     std::string referenced_table = getReferencedTableName(field.getType());
+    
 
-    if (field.getOptions().count(OPTION::MANY_TO_MANY)) {
-        return false; 
+    if(!field.getOptions().count(OPTION::MANY_TO_MANY) && !field.getOptions().count(OPTION::MANY_TO_ONE) && 
+        !field.getOptions().count(OPTION::ONE_TO_MANY) && !field.getOptions().count(OPTION::ONE_TO_ONE)){
+
+        if(field.getOptions().count(OPTION::ID)){
+            return "\t" + field.getName() + " INT PRIMARY KEY AUTO_INCREMENT";
+        }else{
+            if (field.getType() == "int") {
+                sql_type = " INT";
+            } else if (field.getType() == "std::string" || field.getType() == "string") {
+                sql_type = " VARCHAR(255)";
+            }
+            return "\t" + field.getName() + sql_type;
+        }
+    }else if(!field.getOptions().count(OPTION::MANY_TO_MANY) && !field.getOptions().count(OPTION::ONE_TO_MANY)){
+        foreign_keys_.insert(
+            "ALTER TABLE " + tableName + 
+            "\nADD COLUMN " + referenced_table + "_id INTEGER REFERENCES " + referenced_table + "(id);"
+        ); 
     }
-
-    if (field.getType() == "int") {
-        sql_type = " INT";
-    } else if (field.getType() == "std::string") {
-        sql_type = " VARCHAR(255)";
-    } else {
-        sql_type = "_id INT";
-        foreign_key = " REFERENCES " + referenced_table + "(id)";
-    }
-
-    if (field.getOptions().count(OPTION::ID)) {
-        option_str = " PRIMARY KEY AUTO_INCREMENT";
-    } else if (field.getOptions().count(OPTION::ONE_TO_ONE)) {
-        option_str += " UNIQUE";
-        foreign_key = " REFERENCES " + referenced_table + "(id)";
-    } else if (field.getOptions().count(OPTION::MANY_TO_ONE)) {
-        foreign_key = " REFERENCES " + referenced_table + "(id)";
-    }
-
-    std::cout << "\t" << field.getName() << sql_type << option_str << foreign_key;
-    return true;
+    return std::nullopt;
 }
 
+void generateForeignKeys(std::set<std::string> keys){
+    for(auto str : keys){
+        std::cout << str << std::endl << std::endl;
+    }
+}
+
+
 void SQLBuilder::createTables(std::set<Table> tables) {
-    for (auto table : tables) {
-        std::cout << "CREATE TABLE IF NOT EXISTS " << table.getName() << " (" << std::endl;
+    for (const auto& table : tables) {
+        std::ostringstream oss;
+        oss << "CREATE TABLE IF NOT EXISTS " << table.getName() << " (\n";
 
-        bool first = true;
-        for (auto field : table.getFields()) {
-            if (field.getOptions().count(OPTION::MANY_TO_MANY) || field.getOptions().count(OPTION::ONE_TO_MANY)) {
-                continue; 
+        std::vector<std::string> fieldLines;
+
+        for (const auto& field : table.getFields()) {
+            auto line = getNormalizeField(field, table.getName());
+            if (line.has_value()) {
+                fieldLines.push_back(line.value());
             }
-
-            if (!first) {
-                std::cout << "," << std::endl;
-            }
-
-            analysField(field, table.getName());
-            first = false;
         }
 
-        std::cout << "\n);\n" << std::endl;
+        if (!fieldLines.empty()) {
+            for (size_t i = 0; i < fieldLines.size(); ++i) {
+                oss << fieldLines[i];
+                if (i != fieldLines.size() - 1) {
+                    oss << ",";
+                }
+                oss << "\n";
+            }
+        }
+
+        oss << ");\n\n";
+        std::cout << oss.str();
     }
+
     generateManyToManyTables(tables);
+    generateForeignKeys(foreign_keys_);
 }

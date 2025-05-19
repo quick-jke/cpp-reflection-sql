@@ -2,7 +2,6 @@
 
 Field::Field(const std::string& name, const std::string& type, std::set<OPTION> options) : name_(name), type_(type), options_(options){}
 
-
 std::string Field::getSQLNormalize(){
     std::string options;
     if(options_.count(OPTION::ID)){
@@ -88,3 +87,18 @@ std::string Field::toString(){
     
     return "\tfield{ name: " + name_ + ", type: " + type_ + (options_.size() ? ", options: [" + options + " ]}" : "");  
 }
+
+std::set<OPTION> Field::getOptions(){
+    return options_;
+}
+
+std::string Field::getType(){
+    return type_;
+}
+
+
+
+
+
+
+
