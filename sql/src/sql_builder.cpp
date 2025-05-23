@@ -1,122 +1,89 @@
-#include "sql_builder.hpp"
+// #include "sql_builder.hpp"
 
-SQLBuilder::SQLBuilder(){
-}
-
-
+// namespace quick{
+// namespace ultra{
 
 
-std::string getReferencedTableName(const std::string& type) {
-    std::string result = type;
+// SQLBuilder::SQLBuilder(){}
 
-    size_t template_open = result.find('<');
-    if (template_open != std::string::npos) {
-        size_t template_close = result.rfind('>');
-        if (template_close != std::string::npos && template_close > template_open) {
-            result = result.substr(template_open + 1, template_close - template_open - 1);
-        }
-    }
+// bool isDependency(std::set<OPTION> options){
+//     return (!options.count(OPTION::MANY_TO_MANY) && !options.count(OPTION::MANY_TO_ONE) && 
+//             !options.count(OPTION::ONE_TO_MANY) && !options.count(OPTION::ONE_TO_ONE));
+// }
 
-    while (!result.empty() && (result.back() == '*' || result.back() == ' ')) {
-        result.pop_back();
-    }
+// std::optional<std::string> normalizeFireignKey(const std::string& tableName, Field field){
+//     std::stringstream option;
+//     if(field.getOptions().count(OPTION::MANY_TO_MANY)){
+//         option << "[MANY_TO_MANY]";
+//     }
+//     if(field.getOptions().count(OPTION::MANY_TO_ONE)){
+//         option << "[MANY_TO_ONE]";
+//     }
+//     if(field.getOptions().count(OPTION::ONE_TO_MANY)){
+//         option << "[ONE_TO_MANY]";
+//     }
+//     if(field.getOptions().count(OPTION::ONE_TO_ONE)){
+//         option << "[ONE_TO_ONE]";
+//     }
+//     return "alter table " + tableName + " " + field.getName() + "_id " + option.str();
+// }
 
-    return result;
-}
-
-void generateManyToManyTables(std::set<Table> tables) {
-    std::set<std::pair<std::string, std::string>> processed;
-
-    for (auto table : tables) {
-        for (auto field : table.getFields()) {
-            if (field.getOptions().count(OPTION::MANY_TO_MANY)) {
-                std::string other_table = getReferencedTableName(field.getType());
-                std::string table1 = table.getName();
-                std::string table2 = other_table;
-
-                if (table1 > table2) std::swap(table1, table2);
-
-                if (processed.count({table1, table2})) {
-                    continue;
-                }
-
-                processed.insert({table1, table2});
-
-                std::string join_table = table1 + "_" + table2;
-
-                std::cout << "CREATE TABLE IF NOT EXISTS " << join_table << " (" << std::endl;
-                std::cout << "\t" << table1 << "_id INT REFERENCES " << table1 << "(id)," << std::endl;
-                std::cout << "\t" << table2 << "_id INT REFERENCES " << table2 << "(id)," << std::endl;
-                std::cout << "\tPRIMARY KEY (" << table1 << "_id, " << table2 << "_id)" << std::endl;
-                std::cout << ");\n" << std::endl;
-            }
-        }
-    }
-}
-
-
-std::optional<std::string> SQLBuilder::getNormalizeField(Field field, const std::string& tableName) {
-    std::string sql_type;
-    std::string referenced_table = getReferencedTableName(field.getType());
+// std::optional<std::string> SQLBuilder::normalizeField(const std::string& tableName, Field field){
+//     std::stringstream oss;
+//     if(isDependency(field.getOptions())){
+//         if(field.getOptions().count(OPTION::ID)){
+//             oss << "\t" << field.getName() << " INT PRIMARY KEY AUTO_INCREMENT";
+//         }else{
+//             oss << "\t" << field.getName() << " " << varToString(field.getType());
+//         }
+//         return oss.str();
+//     }else{
+//         auto key = normalizeFireignKey(tableName, field);
+//         if(key.has_value()){
+//             foreign_keys_.push_back(key.value());
+//         }
+//         return std::nullopt;
+//     }
     
+    
+// }
 
-    if(!field.getOptions().count(OPTION::MANY_TO_MANY) && !field.getOptions().count(OPTION::MANY_TO_ONE) && 
-        !field.getOptions().count(OPTION::ONE_TO_MANY) && !field.getOptions().count(OPTION::ONE_TO_ONE)){
+// std::vector<std::string> SQLBuilder::getSqlByEntitiesAndDependencies(std::set<Table> tables, dependencies dep_set){
+//     std::vector<std::string> everything;
+    
+//     for (const auto& table : tables) {
+//         std::stringstream createStmt;
+//         createStmt << "CREATE TABLE IF NOT EXISTS `" << table.getName() << "` (\n";
 
-        if(field.getOptions().count(OPTION::ID)){
-            return "\t" + field.getName() + " INT PRIMARY KEY AUTO_INCREMENT";
-        }else{
-            if (field.getType() == "int") {
-                sql_type = " INT";
-            } else if (field.getType() == "std::string" || field.getType() == "string") {
-                sql_type = " VARCHAR(255)";
-            }
-            return "\t" + field.getName() + sql_type;
-        }
-    }else if(!field.getOptions().count(OPTION::MANY_TO_MANY) && !field.getOptions().count(OPTION::ONE_TO_MANY)){
-        foreign_keys_.insert(
-            "ALTER TABLE " + tableName + 
-            "\nADD COLUMN " + referenced_table + "_id INTEGER REFERENCES " + referenced_table + "(id);"
-        ); 
-    }
-    return std::nullopt;
-}
+//         std::vector<std::string> fieldsSQL;
 
-void generateForeignKeys(std::set<std::string> keys){
-    for(auto str : keys){
-        std::cout << str << std::endl << std::endl;
-    }
-}
+//         for (const auto& field : table.getFields()) {
+//             auto fieldDef = normalizeField(table.getName(), field);
+//             if (fieldDef.has_value()) {
+//                 fieldsSQL.push_back(fieldDef.value());
+//             }
+//         }
 
+//         if (fieldsSQL.empty()) {
+//             continue;
+//         }
+        
+//         for (size_t i = 0; i < fieldsSQL.size(); ++i) {
+//             createStmt << fieldsSQL[i];
+//             if (i != fieldsSQL.size() - 1) {
+//                 createStmt << ",";
+//             }
+//             createStmt << "\n";
+//         }
 
-void SQLBuilder::createTables(std::set<Table> tables) {
-    for (const auto& table : tables) {
-        std::ostringstream oss;
-        oss << "CREATE TABLE IF NOT EXISTS " << table.getName() << " (\n";
-
-        std::vector<std::string> fieldLines;
-
-        for (const auto& field : table.getFields()) {
-            auto line = getNormalizeField(field, table.getName());
-            if (line.has_value()) {
-                fieldLines.push_back(line.value());
-            }
-        }
-
-        if (!fieldLines.empty()) {
-            for (size_t i = 0; i < fieldLines.size(); ++i) {
-                oss << fieldLines[i];
-                if (i != fieldLines.size() - 1) {
-                    oss << ",";
-                }
-                oss << "\n";
-            }
-        }
-
-        oss << ");\n\n";
-        std::cout << oss.str();
-    }
-
-    generateManyToManyTables(tables);
-    generateForeignKeys(foreign_keys_);
-}
+//         createStmt << ");\n\n";
+//         everything.push_back(createStmt.str());
+//     }
+//     for(auto key : foreign_keys_){
+//         everything.push_back(key);
+//     }
+//     return everything;
+// }
+    
+// }
+// }

@@ -7,37 +7,221 @@
 #include <vector>
 #include <algorithm>
 #include <filesystem>
+#include <iterator>
 
+
+namespace quick{
+namespace ultra{
 namespace fs = std::filesystem;
 
+HeaderScanner::HeaderScanner(){}
 
-
-bool HeaderScanner::isEntityFile(const fs::path& path) {
+bool isEntityFile(const fs::path& path) {
     return fs::is_regular_file(path) &&
            path.extension() == ".hpp" &&
            path.filename().string().find(".entity") != std::string::npos;
 }
 
-std::optional<std::set<Table>> HeaderScanner::getTables(){
+std::pair<OPTION, std::string> HeaderScanner::parseDependencyString(std::string dependency_string) {
+    OPTION option = UNKNOWN;
+    std::string table = "";
+    size_t pos = -1;
+
+    std::vector<std::string> posible_options = { "ONE_TO_ONE", "ONE_TO_MANY", "MANY_TO_MANY", "MANY_TO_ONE" };
+
+    for (const auto& option_substr : posible_options) {
+        if ((pos = dependency_string.find(option_substr)) != std::string::npos) {
+            option = stringToOptionString(option_substr);
+
+            size_t openPos = dependency_string.find('(');
+            size_t closePos = dependency_string.find(')');
+
+            if (openPos != std::string::npos && closePos != std::string::npos && openPos < closePos) {
+                table = dependency_string.substr(openPos + 1, closePos - openPos - 1);
+            }
+
+            break;
+        }
+    }
+
+    if (option == UNKNOWN || table.empty()) {
+        throw std::runtime_error("Invalid dependency format or unknown option");
+    }
+
+    return { option, table };
+}
+
+std::vector<std::string> HeaderScanner::parseFieldTokens(std::string& field) {
+    field.erase(std::remove(field.begin(), field.end(), ';'), field.end());
+    std::istringstream iss(field);
+    std::vector<std::string> tokens;
+    std::copy(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(), std::back_inserter<std::vector<std::string> >(tokens));
+    return tokens;
+}
+
+std::pair<dependencies, std::set<Table>> HeaderScanner::parseDependenciesList(dependenciesByTables deps_by_tables) {
+    dependencies dset{};
+    std::set<Table> tablesSet;
+
+    for (const auto& [table_name, fields] : deps_by_tables) {
+        std::set<Field> tableFields;
+
+        for (const auto& field : fields) {
+            if (field.empty()) continue;
+
+            bool isDependency = false;
+            for (const auto& option_str : { "ONE_TO_ONE", "ONE_TO_MANY", "MANY_TO_MANY", "MANY_TO_ONE" }) {
+                if (field.find(option_str) != std::string::npos) {
+                    isDependency = true;
+                    break;
+                }
+            }
+
+            if (isDependency) {
+                auto field_tokens = parseFieldTokens(const_cast<std::string&>(field));
+                if (field_tokens.size() >= 1) {
+                    try {
+                        auto [option, table2] = parseDependencyString(field_tokens[0]);
+                        tables ts{ table_name, table2 };
+                        dset.insert({ option, ts });
+                    }
+                    catch (...) {
+                        continue;
+                    }
+                }
+            }
+            else {
+                std::string processedField = field;
+
+                bool isId = (processedField.find("ID") != std::string::npos);
+                if (isId) {
+                    processedField.erase(processedField.begin(), processedField.begin() + 2);
+                    processedField.erase(processedField.begin(),
+                        std::find_if(processedField.begin(), processedField.end(),
+                            [](char c) { return !std::isspace(c); }));
+                }
+
+                std::istringstream iss(processedField);
+                std::vector<std::string> tokens;
+                std::string token;
+
+                while (iss >> token) {
+                    tokens.push_back(token);
+                }
+
+                if (tokens.size() >= 2) {
+                    std::string typeStr = tokens[0];
+                    std::string nameStr = tokens[1];
+
+                    nameStr.erase(std::remove(nameStr.begin(), nameStr.end(), ';'), nameStr.end());
+
+                    SQLVAR sqlType = stringToSQLVAR(typeStr);
+
+                    tableFields.emplace(nameStr, sqlType, isId);
+                }
+            }
+        }
+
+        tablesSet.emplace(table_name, tableFields);
+    }
+
+    return { dset, tablesSet };
+}
+
+void analyzeDependencies(dependencies deps) {
+    for (auto dep : deps) {
+        auto [tab1, tab2] = dep.second;
+        switch (dep.first)
+        {
+        case ONE_TO_ONE: {
+            std::cout << "added foreign key{" << tab2 << "_id INT} to table{" << tab1 << "}" << std::endl;
+            break;
+        }
+
+        case ONE_TO_MANY: {
+            std::cout << "added foreign key{" << tab1 << "_id to table{" << tab2 << "}" << std::endl;
+            break;
+        }
+        case MANY_TO_ONE: {
+            std::cout << "added foreign key{" << tab2 << "_id to table{" << tab1 << "}" << std::endl;
+            break;
+        }
+        case MANY_TO_MANY: {
+            std::cout << "added table {" << tab1 << "_" << tab2 << "}" << std::endl;
+            std::cout << "with foreign keys{" << tab1 << "_id INT, " << tab2 << "_id INT}" << std::endl;
+            break;
+        }
+        default:
+            break;
+        }
+    }
+}
+
+std::pair<std::set<Table>, dependencies> HeaderScanner::getTablesAndDependencies(){
     std::set<Table> tables;
+    dependencies dep_set;
+    dependenciesByTables deps_by_tables;
     try {
         for (const auto& entry : fs::recursive_directory_iterator("models")) {
             if (isEntityFile(entry.path())) {
                 try {
-                    tables.insert(getTableFromFile(entry.path().string()));
+                    auto [table_name, fields] = getTableStructure(entry.path().string());
+
+                    deps_by_tables.insert({table_name, fields});
+
                 } catch (const std::exception& e) {
                     std::cerr << "Error parsing file " << entry.path() << ": " << e.what() << "\n";
                 }
             }
         }
-        return tables;
+
+        auto [dependencyList, tableStructs] = parseDependenciesList(deps_by_tables);
+
+        std::cout << "=== Table Structures ===\n";
+        for(auto table : tableStructs){
+            std::cout << table.toString() << std::endl;
+        }
+
+        std::cout << "=== Dependencies ===\n";
+        for (const auto& [option, tables] : dependencyList) {
+            std::cout << optionToString(option) << ": " << tables.first << " -> " << tables.second << "\n";
+        }
+
+        std::cout << "\n=== Analysis of Dependencies ===\n";
+        analyzeDependencies(dependencyList);
+
+        return {tables, dep_set};
     } catch (const fs::filesystem_error& e) {
         std::cerr << "Filesystem error: " << e.what() << "\n";
-        return std::nullopt;
+        return {tables, dep_set};
     }
 }
 
-Table HeaderScanner::getTableFromFile(const std::string& filePath){
+std::string trims(const std::string& s) {
+    size_t first = s.find_first_not_of(" \t\n\v\f\r");
+    if (first == std::string::npos) return "";
+    size_t last = s.find_last_not_of(" \t\n\v\f\r");
+    return s.substr(first, last - first + 1);
+}
+
+std::set<std::string> HeaderScanner::parseBody(const std::string& body){
+    
+    std::istringstream iss(body);
+    std::string line;
+    std::set<std::string> fields;
+
+    while (std::getline(iss, line)) {
+        line = trims(line);
+        if (line.empty()) continue;
+        
+        fields.insert(line);
+        
+    }
+    return fields;
+}
+
+std::pair<std::string, std::set<std::string>> HeaderScanner::getTableStructure(const std::string& filePath){
+
     fs::path path = fs::absolute(filePath);
 
     if (!fs::exists(path)) {
@@ -57,11 +241,11 @@ Table HeaderScanner::getTableFromFile(const std::string& filePath){
     buffer << file.rdbuf();
     std::string content = buffer.str();
 
-    size_t structPos = content.find("struct ");
-    if (structPos == std::string::npos)
-        throw std::runtime_error("No 'struct' found in file");
+    size_t entityPos = content.find("ENTITY ");
+    if (entityPos == std::string::npos)
+        throw std::runtime_error("No 'ENTITY' found in file");
 
-    size_t nameStart = content.find_first_not_of(" \t\n\r", structPos + 7);
+    size_t nameStart = content.find_first_not_of(" \t\n\r", entityPos + 7);
     size_t nameEnd = content.find_first_of(" \t\n\r{", nameStart);
 
     std::string tableName = content.substr(nameStart, nameEnd - nameStart);
@@ -71,111 +255,14 @@ Table HeaderScanner::getTableFromFile(const std::string& filePath){
 
     std::string tableBody = content.substr(bodyStart + 1, bodyEnd - bodyStart - 1);
 
-    // std::cout << "name: " << tableName << std::endl << "body: " << tableBody << std::endl;
-
-    auto [fields, dependencies] = getFieldsByBody(tableBody);
-
-
-    return Table(tableName, fields, dependencies);
-}
-
-std::string trims(const std::string& s) {
-    size_t first = s.find_first_not_of(" \t\n\v\f\r");
-    if (first == std::string::npos) return "";
-    size_t last = s.find_last_not_of(" \t\n\v\f\r");
-    return s.substr(first, last - first + 1);
-}
-bool isOptionKeyword(const std::string& line, std::set<OPTION>& pendingOptions) {
-    if (line == "ID") {
-        pendingOptions.insert(OPTION::ID);
-        return true;
-    } else if (line == "MANY_TO_MANY") {
-        pendingOptions.insert(OPTION::MANY_TO_MANY);
-        return true;
-    } else if (line == "ONE_TO_MANY") {
-        pendingOptions.insert(OPTION::ONE_TO_MANY);
-        return true;
-    } else if (line == "MANY_TO_ONE") {
-        pendingOptions.insert(OPTION::MANY_TO_ONE);
-        return true;
-    } else if (line == "ONE_TO_ONE") {
-        pendingOptions.insert(OPTION::ONE_TO_ONE);
-        return true;
-    }
-    return false;
-}
-void parseFieldLine(const std::string& line, std::string& type, std::string& name) {
-    size_t lastSpace = line.find_last_of(' ');
-    if (lastSpace == std::string::npos || lastSpace == 0) {
-        type = "";
-        name = "";
-        return;
-    }
-    name = line.substr(lastSpace + 1);
-    if(!name.empty()){
-        name.pop_back();
-    }
-    type = line.substr(0, lastSpace);
-}
-
-bool isPrimitiveType(const std::string& type) {
-    return type == "int" || type == "std::string";
-}
-void extractDependenciesFromType(const std::string& typeStr, std::set<std::string>& dependencies) {
-    std::string baseType = typeStr;
-    bool isVector = false;
-
-    if (baseType.find("std::vector<") != std::string::npos) {
-        isVector = true;
-        size_t start = baseType.find('<');
-        size_t end = baseType.rfind('>');
-        if (start != std::string::npos && end != std::string::npos && end > start + 1) {
-            baseType = baseType.substr(start + 1, end - start - 1);
-            baseType = trims(baseType);
-        } else {
-            return; 
-        }
-    }
-
-    if (!baseType.empty() && baseType.back() == '*') {
-        baseType.pop_back();
-        baseType = trims(baseType);
-    }
-
-    if (!isPrimitiveType(baseType) && !baseType.empty()) {
-        dependencies.insert(baseType);
-    }
-}
-
-std::pair<std::set<Field>, std::set<std::string>> HeaderScanner::getFieldsByBody(const std::string& body) {
-    std::set<Field> fields;
-    std::set<std::string> dependencies;
-    std::istringstream iss(body);
-    std::string line;
-    std::set<OPTION> pendingOptions;
-
-    while (std::getline(iss, line)) {
-        line = trims(line);
-        if (line.empty()) continue;
-
-        if (isOptionKeyword(line, pendingOptions)) {
-            continue;
-        }
-
-        std::string fieldTypeStr, fieldName;
-        parseFieldLine(line, fieldTypeStr, fieldName);
-
-        if (fieldName.empty() || fieldTypeStr.empty()) {
-            continue; 
-        }
-
-        extractDependenciesFromType(fieldTypeStr, dependencies);
-
-        fields.insert({fieldName, fieldTypeStr, pendingOptions});
-        pendingOptions.clear();
-    }
-
     
 
-    return {fields, dependencies};
+    auto bodyFields = parseBody(tableBody);
+
+
+
+    return { tableName, bodyFields };
 }
+
+
+}}
